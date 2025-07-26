@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TradingView con Herramientas Personalizadas</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #101010;
+      color: white;
+    }
+    header {
+      padding: 1rem;
+      background: #1e1e1e;
+      text-align: center;
+    }
+    #tradingview-container {
+      position: relative;
+      height: 80vh;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    .mark-line {
+      position: absolute;
+      height: 2px;
+      width: 100%;
+      background: red;
+      z-index: 2;
+      cursor: move;
+    }
+    .toolbox {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 3;
+    }
+    .toolbox button {
+      display: block;
+      margin-bottom: 5px;
+      background: #333;
+      color: #fff;
+      border: none;
+      padding: 5px;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .toolbox button:hover {
+      background: #555;
+    }
+    .overlay-message {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 8px 12px;
+      border-radius: 5px;
+      z-index: 4;
+      font-size: 14px;
+    }
+    .capture-box {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 3;
+    }
+    .capture-box button, .capture-box input {
+      margin-top: 5px;
+      display: block;
+    }
+    #btn-volver {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 6;
+      background: #ff4444;
+      color: white;
+      padding: 8px 15px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📈 TradingView + Herramientas Personalizadas</h1>
+  </header>
+
+  <div id="tradingview-container">
+    <div class="toolbox">
+      <button onclick="modoGrafico()">🖱️ Modo gráfico</button>
+      <button onclick="modoLineas()">📏 Modo líneas</button>
+      <button onclick="limpiarLineas()">🧹 Limpiar</button>
+    </div>
+    <div class="capture-box">
+      <button onclick="tomarCaptura()">📸 Capturar imagen</button>
+      <button onclick="toggleGrabacion()" id="btn-grabar">🎥 Iniciar grabación</button>
+      <button onclick="seleccionarYReproducirVideo()">📂 Cargar video local (.webm)</button>
+    </div>
+    <div class="overlay-message" id="modo-actual"></div>
+    <button id="btn-volver" onclick="volverAGrafico()">🔙 Volver al gráfico</button>
+    <iframe id="tv-iframe" src="https://s.tradingview.com/widgetembed/?symbol=NASDAQ%3AAAPL&interval=15&theme=dark"></iframe>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script>
+    let container = document.getElementById("tradingview-container");
+    let overlayMsg = document.getElementById("modo-actual");
+    let activo = false;
+
+    function mostrarMensaje(msg) {
+      overlayMsg.textContent = msg;
+      overlayMsg.style.display = "block";
+      setTimeout(() => overlayMsg.style.display = "none", 3000);
+    }
+
+    function modoGrafico() {
+      activo = false;
+      container.style.cursor = "default";
+      document.querySelectorAll(".mark-line").forEach(line => line.style.pointerEvents = "none");
+      document.getElementById("tv-iframe").style.pointerEvents = "auto";
+      mostrarMensaje("🖱️ Modo gráfico activado");
+    }
+
+    function modoLineas() {
+      activo = true;
+      container.style.cursor = "crosshair";
+      document.querySelectorAll(".mark-line").forEach(line => line.style.pointerEvents = "auto");
+      document.getElementById("tv-iframe").style.pointerEvents = "none";
+      mostrarMensaje("📏 Modo líneas activado");
+    }
+
+    function limpiarLineas() {
+      document.querySelectorAll(".mark-line").forEach(line => line.remove());
+      mostrarMensaje("🧹 Líneas eliminadas");
+    }
+
+    container.addEventListener("click", function (e) {
+      if (!activo) return;
+      const y = e.clientY - container.getBoundingClientRect().top;
+      const linea = document.createElement("div");
+      linea.className = "mark-line";
+      linea.style.top = y + "px";
+
+      let isDragging = false;
+      let offsetY;
+
+      linea.addEventListener("mousedown", (e) => {
+        isDragging = true;
+        offsetY = e.offsetY;
+        e.preventDefault();
+      });
+
+      document.addEventListener("mousemove", (e) => {
+        if (!isDragging) return;
+        const containerTop = container.getBoundingClientRect().top;
+        const newY = e.clientY - containerTop - offsetY;
+        linea.style.top = `${newY}px`;
+      });
+
+      document.addEventListener("mouseup", () => {
+        isDragging = false;
+      });
+
+      linea.addEventListener("dblclick", () => {
+        linea.remove();
+      });
+
+      container.appendChild(linea);
+    });
+
+    modoGrafico();
+
+    function tomarCaptura() {
+      html2canvas(container).then(canvas => {
+        const link = document.createElement("a");
+        link.download = "captura_chart.png";
+        link.href = canvas.toDataURL();
+        link.click();
+      });
+    }
+
+    let mediaRecorder;
+    let recordedChunks = [];
+    let grabando = false;
+
+    function toggleGrabacion() {
+      const btn = document.getElementById("btn-grabar");
+      if (!grabando) {
+        navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+          .then(stream => {
+            mediaRecorder = new MediaRecorder(stream);
+            mediaRecorder.ondataavailable = event => {
+              if (event.data.size > 0) recordedChunks.push(event.data);
+            };
+            mediaRecorder.onstop = () => {
+              const blob = new Blob(recordedChunks, { type: "video/webm" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "grabacion_chart.webm";
+              a.click();
+              recordedChunks = [];
+            };
+            mediaRecorder.start();
+            btn.textContent = "⏹️ Detener grabación";
+            grabando = true;
+          })
+          .catch(err => alert("Error al iniciar grabación: " + err));
+      } else {
+        mediaRecorder.stop();
+        btn.textContent = "🎥 Iniciar grabación";
+        grabando = false;
+      }
+    }
+
+    function seleccionarYReproducirVideo() {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "video/webm";
+
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const url = URL.createObjectURL(file);
+
+        const video = document.createElement("video");
+        video.src = url;
+        video.muted = true;
+        video.autoplay = true;
+        video.style.position = "fixed";
+        video.style.bottom = "10px";
+        video.style.right = "10px";
+        video.style.width = "320px";
+        video.controls = true;
+        video.style.zIndex = 9999;
+
+        document.body.appendChild(video);
+
+        try {
+          await video.play();
+          await video.requestPictureInPicture();
+        } catch (err) {
+          console.error("No se pudo activar PiP:", err);
+          alert("⚠️ No se pudo activar el modo PiP.");
+        }
+      };
+
+      input.click();
+    }
+
+    function volverAGrafico() {
+      document.getElementById("tv-iframe").style.display = "block";
+      document.getElementById("btn-volver").style.display = "none";
+    }
+  </script>
+</body>
+</html>
